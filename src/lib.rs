@@ -1,13 +1,11 @@
-use measurement::Measurement;
-use perfect_hash::PerfectHash;
+use hashmap::StationsMap;
 
 pub mod measurement;
-pub mod perfect_hash;
+pub mod hashmap;
 
-const NUMBER_OF_STATIONS: usize = 413;
 
-pub fn aggregate(content: &str) -> PerfectHash {
-    let mut map = PerfectHash::new();
+pub fn aggregate(content: &str) -> StationsMap {
+    let mut map = StationsMap::new();
 
     for line in content.lines() {
         if let Some(i) = line.find(";") {

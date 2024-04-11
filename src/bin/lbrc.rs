@@ -16,5 +16,7 @@ fn main() {
     // let mut xs: Vec<&str> = map.keys().map(|x| x.to_owned()).into_iter().collect();
     // xs.sort_unstable_by(|a, b| a.cmp(b));
 
-    println!("{}", map.entries().len())
+    for entry in map.entries().iter().flatten() {
+        println!("{} {}", entry.0, entry.1);
+    }
 }
