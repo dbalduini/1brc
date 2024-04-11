@@ -30,12 +30,11 @@ impl StationsMap {
         // Safety: we do a mod operation over the capacity.
         let mut slot = unsafe { self.buckets.get_unchecked_mut(i) };
 
-        // check if slot is occupied
+        // linear probe
         while let Some(station) = slot {
             if station.0 == key {
                 break;
             }
-            // linear prob
             i = (i + 1) % NUMBER_OF_STATIONS;
             slot = unsafe { self.buckets.get_unchecked_mut(i) };
         }

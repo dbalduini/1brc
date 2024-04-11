@@ -1,20 +1,14 @@
-use lbrc::aggregate;
-use std::{env, fs};
+use std::env;
+
+use lbrc::parse_file;
 
 fn main() {
     // <string: station name>;<double: measurement>
-    let file = env::args().skip(1).next().unwrap();
+    let path = env::args().skip(1).next().unwrap();
 
-    println!("Reading file: {file}");
-    let content = fs::read_to_string(file).unwrap();
+    println!("Reading file: {path}");
 
-    // let s = &content[0..1024];
-    // println!("{s}");
-
-    let map = aggregate(&content);
-
-    // let mut xs: Vec<&str> = map.keys().map(|x| x.to_owned()).into_iter().collect();
-    // xs.sort_unstable_by(|a, b| a.cmp(b));
+    let map = parse_file(&path);
 
     for entry in map.entries().iter().flatten() {
         println!("{} {}", entry.0, entry.1);

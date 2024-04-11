@@ -79,3 +79,6 @@ It's most helpful to interpret the numbers on a per-row basis (dividing everythi
 945244352 / 1000000
 ~ 945 instructions per row
 
+1028079452
+~ 1028 instructions per row using bytes
+
