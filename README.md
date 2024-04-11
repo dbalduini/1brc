@@ -20,7 +20,7 @@ java --class-path target/average-1.0.0-SNAPSHOT.jar dev.morling.onebrc.CreateMea
 - [hyperfine](https://github.com/sharkdp/hyperfine)
 
 ```
-hyperfine --warmup 3 '.\target\debug\lbrc.exe C:\Dev\Github\1brc\measurements.txt'
+hyperfine --warmup 3 '.\target\debug\lbrc.exe .\data\1M.csv'
 ```
 
 ## Profiling
@@ -30,9 +30,9 @@ Using `perf` and `flamegraph` on WSL2.
 https://www.brendangregg.com/FlameGraphs/cpuflamegraphs.html
 
 ```
-perf target/x86_64-unknown-linux-musl/debug/lbrc /mnt/c/Dev/Github/1brc/measurements.txt
+perf target/debug/lbrc ./data/1M.csv
 ```
 
 ```
-fg -- target/x86_64-unknown-linux-musl/debug/lbrc /mnt/c/Dev/Github/1brc/measurements.txt
+fg -- target/debug/lbrc ./data/1M.csv
 ```
