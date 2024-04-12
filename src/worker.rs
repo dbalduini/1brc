@@ -3,8 +3,13 @@ use crate::StationsMap;
 use std::fs;
 use std::io;
 use std::io::{BufRead, Read, Seek};
-use std::os::windows::fs::FileExt;
 use std::thread;
+
+#[cfg(target_os = "windows")]
+use std::os::windows::fs::FileExt;
+
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::FileExt;
 
 pub struct Worker {
     path: String,
@@ -108,7 +113,11 @@ fn cut_chunk(file: &fs::File, offset: u64) -> Result<u64, io::Error> {
     let mut offset = offset;
     let mut buf: Vec<u8> = vec![0; 32];
 
+    #[cfg(target_os = "windows")]
     file.seek_read(&mut buf, offset)?;
+
+    #[cfg(target_os = "linux")]
+    file.read_at(&mut buf, offset)?;
 
     let chunk_head = String::from_utf8_lossy(&buf);
 
@@ -126,7 +135,11 @@ fn expand_chunk(file: &fs::File, offset: u64, chunk_size: u64) -> Result<u64, st
     let mut chunk_size = chunk_size;
     let mut buf: Vec<u8> = vec![0; 32];
 
+    #[cfg(target_os = "windows")]
     let n = file.seek_read(&mut buf, offset + chunk_size)?;
+
+    #[cfg(target_os = "linux")]
+    let n = file.read_at(&mut buf, offset + chunk_size)?;
 
     let chunk_tail = String::from_utf8_lossy(&buf[..n]);
 
