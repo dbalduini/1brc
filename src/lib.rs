@@ -1,8 +1,6 @@
 use hashmap::StationsMap;
 use worker::WorkerPool;
 
-use std::{fs, io::BufReader};
-
 pub mod hashmap;
 pub mod measurement;
 pub mod worker;
@@ -10,7 +8,6 @@ pub mod worker;
 
 pub fn aggregate_stations(path: &str) -> StationsMap {
     // let content = fs::read_to_string(path).unwrap();
-
 
     // returns the number of logical processors (hyperthreading)
     let num_workers = std::thread::available_parallelism().unwrap().get() - 1;

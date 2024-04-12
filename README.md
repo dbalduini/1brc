@@ -158,7 +158,7 @@ Delhi;28.6100
 
 # Results
 
-Processed 1 Billion Rows File (~16gb) in 1.167s.
+Processed 1 Billion Rows File (~16gb) in ~25 seconds.
 
 
 # Resources

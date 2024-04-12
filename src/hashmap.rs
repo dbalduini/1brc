@@ -1,7 +1,7 @@
 use crate::measurement::Measurement;
 
 // const NUMBER_OF_STATIONS: usize = 413;
-const NUMBER_OF_STATIONS: usize = 1000;
+const NUMBER_OF_STATIONS: usize = 1024;
 
 #[derive(Debug)]
 pub struct Entry(pub String, pub Measurement);

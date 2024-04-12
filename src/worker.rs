@@ -1,14 +1,10 @@
 use crate::StationsMap;
 
-use core::fmt;
-use std::{
-    fmt::Error,
-    fs::{self, File},
-    io::{BufRead, BufReader, Read, Seek, SeekFrom},
-    os::windows::fs::FileExt,
-    sync::Arc,
-    thread::{self, JoinHandle},
-};
+use std::fs;
+use std::io;
+use std::io::{BufRead, Read, Seek};
+use std::os::windows::fs::FileExt;
+use std::thread;
 
 pub struct Worker {
     path: String,
@@ -30,30 +26,19 @@ impl WorkerPool {
     }
 
     pub fn divide_work(&mut self, path: &str) {
-        let file = File::open(path).unwrap();
+        let file = fs::File::open(path).unwrap();
         let size: usize = file.metadata().unwrap().len().try_into().unwrap();
         // let mut reader = BufReader::new(file);
 
         println!("File size {}", size);
 
         let chunk_size = size / self.size;
-
         let buffer_size = chunk_size;
 
         for id in 0..self.size {
             let w = Worker::new(path.to_string(), id, chunk_size);
             self.workers.push(w);
         }
-
-        // let mut count = 0;
-
-        // let mut buf: Vec<u8> = vec![0; buffer_size];
-        // while let Ok(n) = reader.read(&mut buf) {
-        //     if n == 0 {
-        //         break;
-        //     }
-        //     dbg!(n, buf.len());
-        // }
     }
 
     pub fn run(self) -> StationsMap {
@@ -83,36 +68,32 @@ impl Worker {
         }
     }
 
-    pub fn run(self) -> JoinHandle<StationsMap> {
+    pub fn run(self) -> thread::JoinHandle<StationsMap> {
         thread::spawn(move || {
-            let mut file = File::open(self.path).unwrap();
+            // each thread has its own file descriptor
+            let mut file = fs::File::open(self.path).unwrap();
 
-            // never overflows the file size, but can be 1 byte shorter if filesize is odd.
             let chunk_size: u64 = self.chunk_size.try_into().unwrap();
-
             let offset: u64 = (self.id * self.chunk_size).try_into().unwrap();
 
-            // cut file view left
-            let offset = cut_file(&file, offset).unwrap();
-
-            // expand the chunk size
+            // fix the chunk position
+            let offset = cut_chunk(&file, offset).unwrap();
             let chunk_size = expand_chunk(&file, offset, chunk_size).unwrap();
 
-            // set the file cursor
-            file.seek(SeekFrom::Start(offset)).unwrap();
+            // set the file cursor to thread offset
+            file.seek(io::SeekFrom::Start(offset)).unwrap();
 
-            // limit the file to chunk size
+            // limit the file to chunk size so we dont have access to the hole file
             let file = file.take(chunk_size);
 
-            let mut map = StationsMap::new();
-
             // Buffered reader because I cant fit 16GB (1B rows file) in memory
-            let reader = BufReader::with_capacity(1024 * 4, file);
+            // Using a 4MB sized buffer
+            let reader = io::BufReader::with_capacity(1024 * 1024 * 4, file);
 
+            let mut map = StationsMap::new();
             for line in reader.lines() {
                 process_line(line.unwrap(), &mut map);
             }
-
             map
         })
     }
@@ -127,7 +108,7 @@ fn process_line(line: String, map: &mut StationsMap) {
     }
 }
 
-fn cut_file(file: &File, offset: u64) -> Result<u64, std::io::Error> {
+fn cut_chunk(file: &fs::File, offset: u64) -> Result<u64, io::Error> {
     let mut offset = offset;
     let mut buf: Vec<u8> = vec![0; 32];
 
@@ -144,18 +125,14 @@ fn cut_file(file: &File, offset: u64) -> Result<u64, std::io::Error> {
 
     Ok(offset)
 }
- 
-fn expand_chunk(file: &File, offset: u64, chunk_size: u64) -> Result<u64, std::io::Error> {
+
+fn expand_chunk(file: &fs::File, offset: u64, chunk_size: u64) -> Result<u64, std::io::Error> {
     let mut chunk_size = chunk_size;
     let mut buf: Vec<u8> = vec![0; 32];
-    
-    let pos = offset + chunk_size;
-    
-    // go to the end of the chunk
-    let n = file.seek_read(&mut buf, pos)?;
-    
+
+    let n = file.seek_read(&mut buf, offset + chunk_size)?;
+
     let chunk_tail = String::from_utf8_lossy(&buf[..n]);
-    // println!("{} -> ({})", offset, chunk_tail);
 
     for c in chunk_tail.chars() {
         if c == '\n' {
@@ -163,8 +140,6 @@ fn expand_chunk(file: &File, offset: u64, chunk_size: u64) -> Result<u64, std::i
         }
         chunk_size += 1;
     }
-
-    // println!("{} {} {} {}", offset, chunk_size, pos, n);
 
     Ok(chunk_size)
 }
