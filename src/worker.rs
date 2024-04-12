@@ -103,7 +103,9 @@ impl Worker {
 }
 
 fn process_line(line: String, map: &mut StationsMap) {
+    // TODO: improve split_once
     if let Some((station, t)) = line.split_once(";") {
+        // TODO: improve float parsing
         let t = t.parse::<f64>().unwrap();
         map.upsert_float(station, t);
     }
