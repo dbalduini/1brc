@@ -79,6 +79,21 @@ It's most helpful to interpret the numbers on a per-row basis (dividing everythi
 945244352 / 1000000
 ~ 945 instructions per row
 
-1028079452
-~ 1028 instructions per row using bytes
 
+## DuckDB Benchmark
+
+```
+❯ hyperfine --warmup 5 'duckdb -no-stdin -init .\query.sql'
+Benchmark 1: duckdb -no-stdin -init .\query.sql
+  Time (mean ± σ):     128.0 ms ±   3.6 ms    [User: 266.4 ms, System: 17.0 ms]
+  Range (min … max):   115.3 ms … 133.2 ms    20 runs
+```
+
+Versus multithread version
+
+```
+❯ hyperfine --warmup 5 '.\target\release\lbrc.exe .\data\1M.csv'
+Benchmark 1: .\target\release\lbrc.exe .\data\1M.csv
+  Time (mean ± σ):      46.0 ms ±   2.6 ms    [User: 55.7 ms, System: 1.3 ms]
+  Range (min … max):    42.3 ms …  55.6 ms    46 runs
+```

@@ -1,25 +1,21 @@
 use hashmap::StationsMap;
+use worker::WorkerPool;
 
 use std::fs;
 
 pub mod hashmap;
 pub mod measurement;
+pub mod worker;
+
 
 pub fn parse_file(path: &str) -> StationsMap {
-    let mut map = StationsMap::new();
-
     let content = fs::read_to_string(path).unwrap();
 
-    for line in content.lines() {
-        process_line(line, &mut map);
-    }
+    let num_workers = 4;
+    let mut pool = WorkerPool::new(num_workers);
+
+    pool.divide_work(content);
+    let map = pool.run();
 
     map
-}
-
-fn process_line(line: &str, map: &mut StationsMap) {
-    if let Some((station, t)) = line.split_once(";") {
-        let t = t.parse::<f64>().unwrap();
-        map.upsert(station, t);
-    }
 }

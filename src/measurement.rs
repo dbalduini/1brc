@@ -17,11 +17,18 @@ impl Measurement {
         }
     }
 
-    pub fn update(&mut self, t: f64) -> () {
+    pub fn update_float(&mut self, t: f64) -> () {
         self.min = f64::min(self.min, t);
         self.max = f64::max(self.max, t);
         self.count += 1;
         self.total += t;
+    }
+
+    pub fn update(&mut self, other: &Measurement) -> () {
+        self.min = f64::min(self.min, other.min);
+        self.max = f64::max(self.max, other.max);
+        self.count += other.count;
+        self.total += other.total;
     }
 }
 

@@ -10,7 +10,7 @@ fn main() {
 
     let map = parse_file(&path);
 
-    for entry in map.entries().iter().flatten() {
+    for entry in map.entries() {
         println!("{} {}", entry.0, entry.1);
     }
 }
