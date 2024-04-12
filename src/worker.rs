@@ -28,12 +28,10 @@ impl WorkerPool {
     pub fn divide_work(&mut self, path: &str) {
         let file = fs::File::open(path).unwrap();
         let size: usize = file.metadata().unwrap().len().try_into().unwrap();
-        // let mut reader = BufReader::new(file);
 
         println!("File size {}", size);
 
         let chunk_size = size / self.size;
-        let buffer_size = chunk_size;
 
         for id in 0..self.size {
             let w = Worker::new(path.to_string(), id, chunk_size);
