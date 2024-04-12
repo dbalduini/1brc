@@ -4,7 +4,6 @@ https://github.com/gunnarmorling/1brc/tree/main
 
 ## Generating data
 
-
 **1M rows**
 
 ```
