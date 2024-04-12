@@ -1,6 +1,7 @@
 use crate::measurement::Measurement;
 
-const NUMBER_OF_STATIONS: usize = 413;
+// const NUMBER_OF_STATIONS: usize = 413;
+const NUMBER_OF_STATIONS: usize = 1000;
 
 #[derive(Debug)]
 pub struct Entry(pub String, pub Measurement);
@@ -37,7 +38,6 @@ impl StationsMap {
             }
             i = (i + 1) % NUMBER_OF_STATIONS;
             slot = unsafe { self.buckets.get_unchecked_mut(i) };
-            // dbg!(key);
         }
 
         match slot.as_mut() {

@@ -2,17 +2,35 @@
 
 https://github.com/gunnarmorling/1brc/tree/main
 
-## Test data
+## Generating data
 
 ```
 cd C:\Dev\Github\1brc
 ```
 
-1M rows
+**1M rows**
 
 ```
 java --class-path target/average-1.0.0-SNAPSHOT.jar dev.morling.onebrc.CreateMeasurements 1000000
 ```
+
+37ms
+
+**10M rows**
+
+```
+java --class-path target/average-1.0.0-SNAPSHOT.jar dev.morling.onebrc.CreateMeasurements 10000000
+```
+
+200ms
+
+**100M rows**
+```
+java --class-path target/average-1.0.0-SNAPSHOT.jar dev.morling.onebrc.CreateMeasurements 100000000
+```
+
+1.75s
+
 
 ## Benchmark
 
@@ -80,6 +98,7 @@ It's most helpful to interpret the numbers on a per-row basis (dividing everythi
 ~ 945 instructions per row
 
 
+
 ## DuckDB Benchmark
 
 ```
@@ -99,3 +118,53 @@ Benchmark 1: .\target\release\lbrc.exe .\data\1M.csv
   Time (mean ± σ):      37.5 ms ±   2.8 ms    [User: 13.9 ms, System: 2.0 ms]
   Range (min … max):    34.0 ms …  47.6 ms    54 runs
 ```
+
+### Chunk Reader optimization
+
+```
+Tokyo;35.6897
+Jakarta;-6.1750
+Delhi;28.6100
+```
+
+Each worker receives a view of the full file, starting from offset until `offset` + `chunk_size`.
+
+Chunk 1:
+```
+Tokyo;35.6897
+Jakarta;
+```
+
+Chunk 2:
+```
+-6.1750
+Delhi;28.6100
+```
+
+The idea is to expand Chunk 1 until next `\n` and cut Chunk 2 to start at `\nDelhi`.
+- To expand, the chunk must ends with `\n`.
+- To cut, the chunk must start with an Upper Letter.
+
+Chunk 1:
+```
+Tokyo;35.6897
+Jakarta;-6.1750
+```
+
+Chunk 2:
+```
+Delhi;28.6100
+```
+
+# Results
+
+Processed 1 Billion Rows File (~16gb) in 1.167s.
+
+
+# Resources
+
+## Challenges 
+
+- https://questdb.io/blog/billion-row-challenge-step-by-step/
+- https://aminediro.com/posts/billion_row/?utm_source=pocket_saves#
+

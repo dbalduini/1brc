@@ -1,14 +1,19 @@
 use crate::StationsMap;
 
+use core::fmt;
 use std::{
+    fmt::Error,
+    fs::{self, File},
+    io::{BufRead, BufReader, Read, Seek, SeekFrom},
+    os::windows::fs::FileExt,
     sync::Arc,
     thread::{self, JoinHandle},
 };
 
 pub struct Worker {
-    start: usize,
-    end: usize,
-    content: Arc<String>,
+    path: String,
+    id: usize,
+    chunk_size: usize,
 }
 
 pub struct WorkerPool {
@@ -24,27 +29,31 @@ impl WorkerPool {
         }
     }
 
-    pub fn divide_work(&mut self, content: String) {
-        let chunk_size = content.len() / self.size;
-        let mut offset = 0;
-        let mut chunk_end = chunk_size;
+    pub fn divide_work(&mut self, path: &str) {
+        let file = File::open(path).unwrap();
+        let size: usize = file.metadata().unwrap().len().try_into().unwrap();
+        // let mut reader = BufReader::new(file);
 
-        let content = Arc::new(content);
+        println!("File size {}", size);
 
-        while chunk_end <= content.len() {
-            // increase chunk size until next \n char
-            while content.as_bytes()[chunk_end] != b'\n' {
-                chunk_end += 1;
-            }
+        let chunk_size = size / self.size;
 
-            self.workers.push(Worker::new(offset, chunk_end, Arc::clone(&content)));
+        let buffer_size = chunk_size;
 
-            offset = chunk_end + 1;
-            chunk_end = chunk_end + chunk_size;
+        for id in 0..self.size {
+            let w = Worker::new(path.to_string(), id, chunk_size);
+            self.workers.push(w);
         }
 
-        // last worker will process the remainder
-        self.workers.push(Worker::new(offset, content.len() - 1, Arc::clone(&content)));
+        // let mut count = 0;
+
+        // let mut buf: Vec<u8> = vec![0; buffer_size];
+        // while let Ok(n) = reader.read(&mut buf) {
+        //     if n == 0 {
+        //         break;
+        //     }
+        //     dbg!(n, buf.len());
+        // }
     }
 
     pub fn run(self) -> StationsMap {
@@ -66,29 +75,96 @@ impl WorkerPool {
 }
 
 impl Worker {
-    pub fn new(start: usize, end: usize, content: Arc<String>) -> Self {
+    pub fn new(path: String, id: usize, chunk_size: usize) -> Self {
         Self {
-            start,
-            end,
-            content,
+            path,
+            id,
+            chunk_size,
         }
     }
 
     pub fn run(self) -> JoinHandle<StationsMap> {
         thread::spawn(move || {
-            let chunk = &self.content[self.start..self.end];
+            let mut file = File::open(self.path).unwrap();
+
+            // never overflows the file size, but can be 1 byte shorter if filesize is odd.
+            let chunk_size: u64 = self.chunk_size.try_into().unwrap();
+
+            let offset: u64 = (self.id * self.chunk_size).try_into().unwrap();
+
+            // cut file view left
+            let offset = cut_file(&file, offset).unwrap();
+
+            // expand the chunk size
+            let chunk_size = expand_chunk(&file, offset, chunk_size).unwrap();
+
+            // set the file cursor
+            file.seek(SeekFrom::Start(offset)).unwrap();
+
+            // limit the file to chunk size
+            let file = file.take(chunk_size);
+
             let mut map = StationsMap::new();
-            for line in chunk.lines() {
-                process_line(line, &mut map)
+
+            // Buffered reader because I cant fit 16GB (1B rows file) in memory
+            let reader = BufReader::with_capacity(1024 * 4, file);
+
+            for line in reader.lines() {
+                process_line(line.unwrap(), &mut map);
             }
+
             map
         })
     }
 }
 
-fn process_line(line: &str, map: &mut StationsMap) {
+fn process_line(line: String, map: &mut StationsMap) {
     if let Some((station, t)) = line.split_once(";") {
-        let t = t.parse::<f64>().unwrap();
-        map.upsert_float(station, t);
+        match t.parse::<f64>() {
+            Ok(t) => map.upsert_float(station, t),
+            _ => (), //println!("failed to parse floag: {}", line),
+        }
     }
+}
+
+fn cut_file(file: &File, offset: u64) -> Result<u64, std::io::Error> {
+    let mut offset = offset;
+    let mut buf: Vec<u8> = vec![0; 32];
+
+    file.seek_read(&mut buf, offset)?;
+
+    let chunk_head = String::from_utf8_lossy(&buf);
+
+    for c in chunk_head.chars() {
+        if c > 'A' && c < 'Z' {
+            break;
+        }
+        offset += 1;
+    }
+
+    Ok(offset)
+}
+ 
+fn expand_chunk(file: &File, offset: u64, chunk_size: u64) -> Result<u64, std::io::Error> {
+    let mut chunk_size = chunk_size;
+    let mut buf: Vec<u8> = vec![0; 32];
+    
+    let pos = offset + chunk_size;
+    
+    // go to the end of the chunk
+    let n = file.seek_read(&mut buf, pos)?;
+    
+    let chunk_tail = String::from_utf8_lossy(&buf[..n]);
+    // println!("{} -> ({})", offset, chunk_tail);
+
+    for c in chunk_tail.chars() {
+        if c == '\n' {
+            break;
+        }
+        chunk_size += 1;
+    }
+
+    // println!("{} {} {} {}", offset, chunk_size, pos, n);
+
+    Ok(chunk_size)
 }

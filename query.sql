@@ -4,7 +4,7 @@
 
 -- Load the data
 CREATE OR REPLACE TABLE measurements AS
-        SELECT * FROM READ_CSV('./data/1M.csv', header=false, columns= {'station_name':'VARCHAR','measurement':'double'}, delim=';');
+        SELECT * FROM READ_CSV('C:\Dev\Github\1brc\measurements.txt', header=false, columns= {'station_name':'VARCHAR','measurement':'double'}, delim=';');
 
 -- Run calculations
 WITH src AS (SELECT station_name,
