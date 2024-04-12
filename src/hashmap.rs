@@ -1,6 +1,6 @@
-use crate::measurement::{self, Measurement};
+use crate::measurement::Measurement;
 
-const NUMBER_OF_STATIONS: usize = 500;
+const NUMBER_OF_STATIONS: usize = 413;
 
 #[derive(Debug)]
 pub struct Entry(pub String, pub Measurement);
