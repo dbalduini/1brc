@@ -43,15 +43,19 @@ impl WorkerPool {
             chunk_end = chunk_end + chunk_size;
         }
 
+        // last worker will process the remainder
         self.workers.push(Worker::new(offset, content.len() - 1, Arc::clone(&content)));
     }
 
     pub fn run(self) -> StationsMap {
         let mut runners = Vec::new();
+
+        // Run jobs in parallel
         for worker in self.workers {
             runners.push(worker.run());
         }
 
+        // Merge Results
         let mut map = StationsMap::new();
         for runner in runners {
             let res = runner.join().unwrap();
@@ -71,7 +75,6 @@ impl Worker {
     }
 
     pub fn run(self) -> JoinHandle<StationsMap> {
-        println!("starting {} {}", self.start, self.end);
         thread::spawn(move || {
             let chunk = &self.content[self.start..self.end];
             let mut map = StationsMap::new();
