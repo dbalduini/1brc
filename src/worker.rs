@@ -99,10 +99,8 @@ impl Worker {
 
 fn process_line(line: String, map: &mut StationsMap) {
     if let Some((station, t)) = line.split_once(";") {
-        match t.parse::<f64>() {
-            Ok(t) => map.upsert_float(station, t),
-            _ => (), //println!("failed to parse floag: {}", line),
-        }
+        let t = t.parse::<f64>().unwrap();
+        map.upsert_float(station, t);
     }
 }
 
