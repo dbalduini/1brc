@@ -4,7 +4,7 @@ use std::io::BufRead;
 use std::thread;
 use std::{fs, sync::Arc};
 
-use memmap::{Mmap, MmapOptions};
+use memmap::Mmap;
 
 pub struct Worker {
     id: usize,
@@ -30,7 +30,7 @@ impl WorkerPool {
         let file = fs::File::open(path).unwrap();
         let size: usize = file.metadata().unwrap().len().try_into().unwrap();
 
-        let mmap = unsafe { MmapOptions::new().map(&file).unwrap() };
+        let mmap = unsafe { Mmap::map(&file).unwrap() };
 
         println!("File size {}", size);
 
