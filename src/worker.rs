@@ -1,6 +1,6 @@
 use crate::StationsMap;
 
-use std::io::BufRead;
+use std::io::{BufRead, Read};
 use std::thread;
 use std::{fs, sync::Arc};
 
@@ -74,25 +74,38 @@ impl Worker {
             let chunk_size = self.chunk_size;
             let offset = self.id * self.chunk_size;
 
-            let chunk = &self.mmap[offset..offset + chunk_size];
+            let mut chunk = &self.mmap[offset..offset + chunk_size];
 
             let mut map = StationsMap::new();
             let mut c = 0;
-            for line in chunk.lines() {
+            let mut buf = Vec::with_capacity(1024);
+
+            while let Ok(n) = chunk.read_until(b'\n', &mut buf) {
+                if n == 0 {
+                    break;
+                }
+
+                let line = &buf[..n - 1];
+
+                process_line(line, &mut map);
+
                 c += 1;
-                // process_line(line.unwrap(), &mut map);
+                buf.clear();
             }
+
             dbg!(c);
             map
         })
     }
 }
 
-fn process_line(line: String, map: &mut StationsMap) {
-    // TODO: improve split_once
-    if let Some((station, t)) = line.split_once(";") {
-        // TODO: improve float parsing
-        let t = t.parse::<f64>().unwrap_or_default(); // FIXME: this is broken
-        map.upsert_float(station, t);
+#[inline]
+fn process_line(line: &[u8], map: &mut StationsMap) {
+    let mut offset = 0;
+    for c in line {
+        if *c != b';' {
+            offset += 1;
+        }
     }
+    // dbg!(String::from_utf8_lossy(&line[..offset]));
 }
