@@ -5,6 +5,7 @@ pub struct Measurement {
     max: f64,
     total: f64,
     count: usize,
+    // pub hash: usize,
 }
 
 impl Measurement {

@@ -1,20 +1,15 @@
 use crate::StationsMap;
 
-use std::fs;
-use std::io;
-use std::io::{BufRead, Read, Seek};
+use std::io::BufRead;
 use std::thread;
+use std::{fs, sync::Arc};
 
-#[cfg(target_os = "windows")]
-use std::os::windows::fs::FileExt;
-
-#[cfg(target_os = "linux")]
-use std::os::unix::fs::FileExt;
+use memmap::{Mmap, MmapOptions};
 
 pub struct Worker {
-    path: String,
     id: usize,
     chunk_size: usize,
+    mmap: Arc<Mmap>,
 }
 
 pub struct WorkerPool {
@@ -34,12 +29,14 @@ impl WorkerPool {
         let file = fs::File::open(path).unwrap();
         let size: usize = file.metadata().unwrap().len().try_into().unwrap();
 
+        let mmap = unsafe { Arc::new(MmapOptions::new().map(&file).unwrap()) };
+
         println!("File size {}", size);
 
         let chunk_size = size / self.size;
 
         for id in 0..self.size {
-            let w = Worker::new(path.to_string(), id, chunk_size);
+            let w = Worker::new(id, chunk_size, Arc::clone(&mmap));
             self.workers.push(w);
         }
     }
@@ -63,38 +60,24 @@ impl WorkerPool {
 }
 
 impl Worker {
-    pub fn new(path: String, id: usize, chunk_size: usize) -> Self {
+    pub fn new(id: usize, chunk_size: usize, mmap: Arc<Mmap>) -> Self {
         Self {
-            path,
             id,
             chunk_size,
+            mmap,
         }
     }
 
     pub fn run(self) -> thread::JoinHandle<StationsMap> {
         thread::spawn(move || {
             // each thread has its own file descriptor
-            let mut file = fs::File::open(self.path).unwrap();
+            let chunk_size = self.chunk_size;
+            let offset = self.id * self.chunk_size;
 
-            let chunk_size: u64 = self.chunk_size.try_into().unwrap();
-            let offset: u64 = (self.id * self.chunk_size).try_into().unwrap();
-
-            // fix the chunk position
-            let offset = cut_chunk(&file, offset).unwrap();
-            let chunk_size = expand_chunk(&file, offset, chunk_size).unwrap();
-
-            // set the file cursor to thread offset
-            file.seek(io::SeekFrom::Start(offset)).unwrap();
-
-            // limit the file to chunk size so we dont have access to the hole file
-            let file = file.take(chunk_size);
-
-            // Buffered reader because I cant fit 16GB (1B rows file) in memory
-            // Using a 4MB sized buffer
-            let reader = io::BufReader::with_capacity(1024 * 1024 * 4, file);
+            let chunk = &self.mmap[offset..offset + chunk_size];
 
             let mut map = StationsMap::new();
-            for line in reader.lines() {
+            for line in chunk.lines() {
                 process_line(line.unwrap(), &mut map);
             }
             map
@@ -106,51 +89,7 @@ fn process_line(line: String, map: &mut StationsMap) {
     // TODO: improve split_once
     if let Some((station, t)) = line.split_once(";") {
         // TODO: improve float parsing
-        let t = t.parse::<f64>().unwrap();
+        let t = t.parse::<f64>().unwrap_or_default(); // FIXME: this is broken
         map.upsert_float(station, t);
     }
-}
-
-fn cut_chunk(file: &fs::File, offset: u64) -> Result<u64, io::Error> {
-    let mut offset = offset;
-    let mut buf: Vec<u8> = vec![0; 32];
-
-    #[cfg(target_os = "windows")]
-    file.seek_read(&mut buf, offset)?;
-
-    #[cfg(target_os = "linux")]
-    file.read_at(&mut buf, offset)?;
-
-    let chunk_head = String::from_utf8_lossy(&buf);
-
-    for c in chunk_head.chars() {
-        if c > 'A' && c < 'Z' {
-            break;
-        }
-        offset += 1;
-    }
-
-    Ok(offset)
-}
-
-fn expand_chunk(file: &fs::File, offset: u64, chunk_size: u64) -> Result<u64, std::io::Error> {
-    let mut chunk_size = chunk_size;
-    let mut buf: Vec<u8> = vec![0; 32];
-
-    #[cfg(target_os = "windows")]
-    let n = file.seek_read(&mut buf, offset + chunk_size)?;
-
-    #[cfg(target_os = "linux")]
-    let n = file.read_at(&mut buf, offset + chunk_size)?;
-
-    let chunk_tail = String::from_utf8_lossy(&buf[..n]);
-
-    for c in chunk_tail.chars() {
-        if c == '\n' {
-            break;
-        }
-        chunk_size += 1;
-    }
-
-    Ok(chunk_size)
 }

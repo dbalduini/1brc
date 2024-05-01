@@ -17,6 +17,7 @@ impl StationsMap {
         Self { buckets }
     }
 
+    #[inline]
     fn hash(&self, key: &str) -> usize {
         let mut hash: usize = 5381;
         for c in key.chars() {
@@ -48,6 +49,7 @@ impl StationsMap {
 
     pub fn upsert(&mut self, key: &str, measurement: Measurement) -> () {
         let mut i = self.hash(&key) % NUMBER_OF_STATIONS;
+        // let mut i = measurement.hash;
 
         // Safety: we do a mod operation over the capacity.
         let mut slot = unsafe { self.buckets.get_unchecked_mut(i) };
@@ -81,5 +83,4 @@ impl StationsMap {
             }
         }
     }
-
 }
