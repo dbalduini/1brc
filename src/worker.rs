@@ -8,7 +8,8 @@ use memmap::{Mmap, MmapOptions};
 
 pub struct Worker {
     id: usize,
-    chunk_size: usize,
+    start: usize,
+    end: usize,
     mmap: Arc<Mmap>,
 }
 
@@ -29,14 +30,29 @@ impl WorkerPool {
         let file = fs::File::open(path).unwrap();
         let size: usize = file.metadata().unwrap().len().try_into().unwrap();
 
-        let mmap = unsafe { Arc::new(MmapOptions::new().map(&file).unwrap()) };
+        let mmap = unsafe { MmapOptions::new().map(&file).unwrap() };
 
         println!("File size {}", size);
 
         let chunk_size = size / self.size;
 
+        let mut start = 0;
+        let mut chunks = Vec::new();
+
         for id in 0..self.size {
-            let w = Worker::new(id, chunk_size, Arc::clone(&mmap));
+            // align the chunk
+            let mut end = usize::min(start + chunk_size, size);
+            while end < size && unsafe { *mmap.get_unchecked(end) } != b'\n' {
+                end += 1;
+            }
+            chunks.push((id, start, end));
+            start = end;
+        }
+
+        let mmap = Arc::new(mmap);
+
+        for (id, start, end) in chunks {
+            let w = Worker::new(id, start, end, Arc::clone(&mmap));
             self.workers.push(w);
         }
     }
@@ -60,25 +76,21 @@ impl WorkerPool {
 }
 
 impl Worker {
-    pub fn new(id: usize, chunk_size: usize, mmap: Arc<Mmap>) -> Self {
+    pub fn new(id: usize, start: usize, end: usize, mmap: Arc<Mmap>) -> Self {
         Self {
             id,
-            chunk_size,
+            start,
+            end,
             mmap,
         }
     }
 
     pub fn run(self) -> thread::JoinHandle<StationsMap> {
         thread::spawn(move || {
+            // dbg!(self.id, self.start, self.end);
+
             // each thread has its own file descriptor
-            let chunk_size = self.chunk_size;
-            let offset = self.id * self.chunk_size;
-
-            let offset = cut_chunk(&self.mmap, offset);
-            let chunk_size = expand_chunk(&self.mmap, offset, chunk_size);
-            let end = usize::min(offset + chunk_size, self.mmap.len());
-
-            let chunk = &self.mmap[offset..end];
+            let chunk = &self.mmap[self.start..self.end];
 
             let mut map = StationsMap::new();
 
@@ -99,36 +111,4 @@ fn process_line(line: String, map: &mut StationsMap) {
         let t = t.parse::<f64>().unwrap();
         map.upsert_float(station, t);
     }
-}
-
-fn cut_chunk(mmap: &Mmap, offset: usize) -> usize {
-    let mut offset = offset;
-
-    let chunk_head = String::from_utf8_lossy(&mmap[offset..offset + 32]);
-
-    for c in chunk_head.chars() {
-        if c > 'A' && c < 'Z' {
-            break;
-        }
-        offset += 1;
-    }
-
-    offset
-}
-
-fn expand_chunk(mmap: &Mmap, offset: usize, chunk_size: usize) -> usize {
-    let mut chunk_size = chunk_size;
-    let i = usize::min(offset + chunk_size, mmap.len());
-    let j = usize::min(i + 32, mmap.len());
-
-    let chunk_tail = String::from_utf8_lossy(&mmap[i..j]);
-
-    for c in chunk_tail.chars() {
-        if c == '\n' {
-            break;
-        }
-        chunk_size += 1;
-    }
-
-    chunk_size
 }
