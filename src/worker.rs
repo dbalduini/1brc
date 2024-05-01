@@ -77,9 +77,12 @@ impl Worker {
             let chunk = &self.mmap[offset..offset + chunk_size];
 
             let mut map = StationsMap::new();
+            let mut c = 0;
             for line in chunk.lines() {
-                process_line(line.unwrap(), &mut map);
+                c += 1;
+                // process_line(line.unwrap(), &mut map);
             }
+            dbg!(c);
             map
         })
     }
