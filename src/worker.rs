@@ -74,38 +74,25 @@ impl Worker {
             let chunk_size = self.chunk_size;
             let offset = self.id * self.chunk_size;
 
-            let mut chunk = &self.mmap[offset..offset + chunk_size];
+            let chunk = &self.mmap[offset..offset + chunk_size];
 
             let mut map = StationsMap::new();
-            let mut c = 0;
-            let mut buf = Vec::with_capacity(1024);
 
-            while let Ok(n) = chunk.read_until(b'\n', &mut buf) {
-                if n == 0 {
-                    break;
-                }
-
-                let line = &buf[..n - 1];
-
-                process_line(line, &mut map);
-
-                c += 1;
-                buf.clear();
+            for line in chunk.lines() {
+                process_line(line.unwrap(), &mut map);
             }
 
-            dbg!(c);
             map
         })
     }
 }
 
 #[inline]
-fn process_line(line: &[u8], map: &mut StationsMap) {
-    let mut offset = 0;
-    for c in line {
-        if *c != b';' {
-            offset += 1;
-        }
+fn process_line(line: String, map: &mut StationsMap) {
+    // TODO: improve split_once
+    if let Some((station, t)) = line.split_once(";") {
+        // TODO: improve float parsing
+        let t = t.parse::<f64>().unwrap();
+        map.upsert_float(station, t);
     }
-    // dbg!(String::from_utf8_lossy(&line[..offset]));
 }
