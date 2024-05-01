@@ -76,8 +76,9 @@ impl Worker {
 
             let offset = cut_chunk(&self.mmap, offset);
             let chunk_size = expand_chunk(&self.mmap, offset, chunk_size);
+            let end = usize::min(offset + chunk_size, self.mmap.len());
 
-            let chunk = &self.mmap[offset..offset + chunk_size];
+            let chunk = &self.mmap[offset..end];
 
             let mut map = StationsMap::new();
 
@@ -117,7 +118,7 @@ fn cut_chunk(mmap: &Mmap, offset: usize) -> usize {
 
 fn expand_chunk(mmap: &Mmap, offset: usize, chunk_size: usize) -> usize {
     let mut chunk_size = chunk_size;
-    let i = offset + chunk_size;
+    let i = usize::min(offset + chunk_size, mmap.len());
     let j = usize::min(i + 32, mmap.len());
 
     let chunk_tail = String::from_utf8_lossy(&mmap[i..j]);
