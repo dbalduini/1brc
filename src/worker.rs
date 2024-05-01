@@ -1,6 +1,6 @@
 use crate::StationsMap;
 
-use std::io::{BufRead, Read};
+use std::io::BufRead;
 use std::thread;
 use std::{fs, sync::Arc};
 
@@ -74,6 +74,9 @@ impl Worker {
             let chunk_size = self.chunk_size;
             let offset = self.id * self.chunk_size;
 
+            let offset = cut_chunk(&self.mmap, offset);
+            let chunk_size = expand_chunk(&self.mmap, offset, chunk_size);
+
             let chunk = &self.mmap[offset..offset + chunk_size];
 
             let mut map = StationsMap::new();
@@ -95,4 +98,36 @@ fn process_line(line: String, map: &mut StationsMap) {
         let t = t.parse::<f64>().unwrap();
         map.upsert_float(station, t);
     }
+}
+
+fn cut_chunk(mmap: &Mmap, offset: usize) -> usize {
+    let mut offset = offset;
+
+    let chunk_head = String::from_utf8_lossy(&mmap[offset..offset + 32]);
+
+    for c in chunk_head.chars() {
+        if c > 'A' && c < 'Z' {
+            break;
+        }
+        offset += 1;
+    }
+
+    offset
+}
+
+fn expand_chunk(mmap: &Mmap, offset: usize, chunk_size: usize) -> usize {
+    let mut chunk_size = chunk_size;
+    let i = offset + chunk_size;
+    let j = usize::min(i + 32, mmap.len());
+
+    let chunk_tail = String::from_utf8_lossy(&mmap[i..j]);
+
+    for c in chunk_tail.chars() {
+        if c == '\n' {
+            break;
+        }
+        chunk_size += 1;
+    }
+
+    chunk_size
 }
