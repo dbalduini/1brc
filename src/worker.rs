@@ -42,7 +42,7 @@ impl WorkerPool {
         for id in 0..self.size {
             // align the chunk
             let mut end = usize::min(start + chunk_size, size);
-            while end < size && unsafe { *mmap.get_unchecked(end) } != b'\n' {
+            while end < size && mmap[end] != b'\n' {
                 end += 1;
             }
             chunks.push((id, start, end));
